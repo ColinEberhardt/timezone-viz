@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<meta name="viewport" content="initial-scale = 1.0,maximum-scale = 1.0" />
+
+<script src="https://unpkg.com/d3"></script>
+<script src="https://unpkg.com/d3fc"></script>
+<script src="https://unpkg.com/d3-simple-slider"></script>
+<script src="https://tc39.es/proposal-temporal/docs/playground.js"></script>
+
+<style>
+  body {
+    color: #1b1e23;
+    font-family: sans-serif;
+    height: calc(100vh - 2em);
+    margin: 1em;
+    position: relative;
+  }
+  .tick {
+    font-size: 14px;
+  }
+  #container {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 70px;
+    left: 0;
+  }
+  g.flat path {
+    opacity: 0.5;
+  }
+  g.step path {
+    stroke: green;
+  }
+  g.dst path {
+    stroke: red;
+  }
+  g.other path {
+    stroke: blue;
+  }
+  .date-axis path,
+  .date-axis line {
+    display: none;
+  }
+  #info {
+    position: absolute;
+    top: 20px;
+    right: 40px;
+    width: 300px;
+    white-space: pre;
+    font-family: "Courier New", Courier, monospace;
+    border: 1px solid #ccc;
+    background-color: rgba(255, 255, 255, 0.9);
+    padding: 10px;
+    font-size: 12px;
+  }
+  #slider {
+    position: absolute;
+    bottom: 0;
+    width: 700px;
+  }
+  #filter {
+    position: absolute;
+    bottom: 0;
+    right: 20px;
+  }
+  #slider .tick line {
+    display: none;
+  }
+  #slider .tick text {
+    transform: translate(0, -10px);
+  }
+</style>
+
+<div id="container"></div>
+<div id="info"></div>
+<div id="slider"></div>
+<div id="filter">filter: <input id="filterInput" placeholder="filter text"></input></div>
+
+<script src="index.js"></script>

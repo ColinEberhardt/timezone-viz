@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<meta name="viewport" content="initial-scale = 1.0,maximum-scale = 1.0" />
+
+<script src="https://unpkg.com/d3"></script>
+<script src="https://unpkg.com/d3fc"></script>
+
+<style>
+  body {
+    color: #1b1e23;
+    font-size: small;
+    font-family: sans-serif;
+    height: calc(100vh - 2em);
+    margin: 1em;
+    display: flex;
+  }
+  #container {
+    flex: auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr;
+    grid-template-rows: 1fr 1fr 1fr 1fr;
+  }
+  #container > * {
+    margin-top: 10px;
+  }
+  .axis {
+    opacity: 0;
+  }
+  g.end-of-row .axis {
+    opacity: 1;
+  }
+  .date-axis {
+    opacity: 0;
+  }
+  g.end-of-column .date-axis {
+    opacity: 1;
+  }
+  g.step path {
+    stroke: green;
+  }
+  g.dst path {
+    stroke: red;
+  }
+  g.other path {
+    stroke: blue;
+  }
+  .date-axis path,
+  .date-axis line {
+    display: none;
+  }
+</style>
+
+<div id="container"></div>
+
+<script src="index.js"></script>
