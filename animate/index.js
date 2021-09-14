@@ -1,14 +1,3 @@
-const { Temporal } = require("proposal-temporal");
-const fs = require("fs");
-
-const range = (start, end, offset = 1) => {
-  let d = [];
-  for (let i = start; i < end; i += offset) {
-    d.push(i);
-  }
-  return d;
-};
-
 const zones = [
   "Africa/Abidjan",
   "Africa/Accra",
@@ -293,82 +282,194 @@ const zones = [
   "Pacific/Wake",
   "Pacific/Wallis",
 ];
+const shapes = ["flat", "step", "dst", "other"];
 
-const millisToHours = (millis) => millis / (1000000000 * 60 * 60);
-
-const yearRange = [1900, 2020];
-
-const cache = new Map();
-const toInstant = (millis) => {
-  if (cache.has(millis)) {
-    return cache.get(millis);
-  }
-  const instant = Temporal.Instant.fromEpochMilliseconds(millis);
-  cache.set(millis, instant);
-  return instant;
-};
-
-const offsetMillis = (tz, year, day) =>
-  millisToHours(
-    tz.getOffsetNanosecondsFor(toInstant(new Date(year, 0, day).getTime()))
+const transitionsForTimezone = (tzName, year) => {
+  const transitions = [];
+  const tz = Temporal.TimeZone.from(tzName);
+  let instant = Temporal.Instant.fromEpochMilliseconds(
+    new Date(year, 0, 2).getTime()
   );
-
-const determineShape = (arr) => {
-  const uniques = new Set(arr).size;
-  if (uniques == 1) {
-    return "flat";
+  while (instant && instant.toZonedDateTimeISO(tz).year == year) {
+    transitions.push([
+      instant.toZonedDateTimeISO(tz).toPlainDate().toString(),
+      tz.getOffsetStringFor(instant),
+    ]);
+    instant = tz.getNextTransition(instant);
   }
-  if (uniques == 2) {
-    if (arr[0] == arr[arr.length - 1]) {
-      return "dst";
-    } else {
-      return "step";
-    }
-  }
-  return "other";
+  return transitions.map((d) => d.join("  ")).join("\n");
 };
 
-const dataForYear = (year) => {
-  const data = zones
-    .map((zone) => ({
-      name: zone,
-      tz: Temporal.TimeZone.from(zone),
-    }))
-    .map((zone) => {
-      let tzOffsets;
-      // check for flatline
-      const startOffset = offsetMillis(zone.tz, year, 1);
-      const midOffset = offsetMillis(zone.tz, year, 7 * 25);
-      const endOffset = offsetMillis(zone.tz, year, 7 * 50);
-      if (startOffset == endOffset && startOffset == midOffset) {
-        tzOffsets = range(0, 365, 7).map(() => startOffset);
-      } else {
-        tzOffsets = range(0, 365, 7).map((day) =>
-          offsetMillis(zone.tz, year, day)
-        );
-      }
-      return {
-        data: tzOffsets,
-        shape: determineShape(tzOffsets),
-        zone: zone.name,
-      };
+const component = () => {
+  const xScale = d3.scaleLinear().domain([0, 52]);
+  const yScale = d3.scaleLinear().domain([-12, 14]);
+  const line = fc
+    .seriesSvgLine()
+    .crossValue((_, i) => i)
+    .xScale(xScale)
+    .yScale(yScale)
+    .mainValue((d) => d)
+    .decorate((sel) => {
+      sel
+        .style("stroke-width", (d) => d.count / 2)
+        .style("opacity", (d) => (d.shape === "flat" ? 0.3 : 0.8));
     });
 
-  // transpose the data (for the repeat series)
-  // const chartData = range(0, data[0].data.length).map((i) =>
-  //   data.map((d) => d.data[i])
-  // );
-  return data;
+  const offsetAxis = d3.axisRight(yScale).ticks(5);
+  const containerDataJoin = fc.dataJoin("d3fc-group", "tzyear");
+  const plotAreaDataJoin = fc.dataJoin("d3fc-svg", "svg-plot-area");
+  const dateDataJoin = fc.dataJoin("text", "date");
+  const axisDataJoin = fc.dataJoin("d3fc-svg", "axis");
+
+  const base = (selection) => {
+    selection.each((data, index, group) => {
+      const container = containerDataJoin(d3.select(group[index]), [data]);
+
+      container
+        .style("position", "relative")
+        .style("height", "100%")
+        .style("display", "block")
+        .attr("auto-resize", "");
+
+      dateDataJoin(container, [data.year])
+        .style("position", "absolute")
+        .style("bottom", "20px")
+        .style("right", "35px")
+        .style("font-size", "90px")
+        .style("opacity", "0.2")
+        .text((d) => d);
+
+      plotAreaDataJoin(container, [data])
+        .style("position", "absolute")
+        .style("top", "0")
+        .style("bottom", "0")
+        .style("left", "0")
+        .style("right", "20px")
+        .on("measure", (event) => {
+          const { width, height } = event.detail;
+          xScale.range([0, width]);
+          yScale.range([height, 0]);
+        })
+        .on("draw", (event, d) => {
+          const { child } = event.detail;
+          d3.select(child)
+            .selectAll("g")
+            .data(d, (d) => d.year)
+            .join(
+              (enter) =>
+                enter
+                  .append("g")
+                  .attr("class", (d) => d.shape)
+                  .call(line),
+              (update) => update.select("g").call(line),
+              (exit) => exit.remove()
+            );
+        });
+
+      axisDataJoin(container, [data])
+        .style("position", "absolute")
+        .style("top", "0")
+        .style("bottom", "0")
+        .style("right", "0")
+        .style("width", "20px")
+        .on("draw", (event, d) => {
+          const { child } = event.detail;
+          d3.select(child).call(offsetAxis);
+        });
+
+      container.each((d, i, nodes) => nodes[i].requestRedraw());
+    });
+  };
+
+  return base;
 };
 
-const dataForYears = range(yearRange[0], yearRange[1]).map((d) => {
-  console.log(d);
-  return dataForYear(d);
-});
+const transformData = (dataForYear, year) => {
+  const series = dataForYear.map((d) => {
+    return Object.assign(d.data, {
+      zone: d.zone,
+      shape: d.shape,
+      year,
+      key: d.data.join(","),
+    });
+  });
+  return Object.assign(series, { year });
+};
 
-fs.writeFileSync(
-  "data.json",
-  JSON.stringify(dataForYears, function (key, val) {
-    return val.toFixed ? Number(val.toFixed(3)) : val;
-  })
-);
+d3.json("../data.json").then((dataForYears) => {
+  // decode the data
+  dataForYears.forEach((year, i) => {
+    year.forEach((line) => {
+      line.zone = zones[line.z];
+      line.shape = shapes[line.s];
+      let data = [];
+      if (Array.isArray(line.d)) {
+        for (let i = 0; i < line.d.length - 1; i += 2) {
+          const newStuff = Array(line.d[i + 1]).fill(line.d[i]);
+          data = data.concat(newStuff);
+        }
+      } else {
+        data = Array(53).fill(line.d);
+      }
+      line.data = data;
+    });
+  });
+
+  // add a slider
+  const slider = d3
+    .sliderHorizontal()
+    .min(1900)
+    .max(dataForYears.length + 1900 - 1)
+    .step(1)
+    .width(650)
+    .displayValue(false)
+    .tickFormat(d3.format(".0f"))
+    .on("onchange", (val) => {
+      currentYear = val - 1900;
+      render();
+    });
+
+  d3.select("#slider")
+    .append("svg")
+    .attr("width", 700)
+    .attr("height", 40)
+    .append("g")
+    .attr("transform", "translate(30,10)")
+    .call(slider);
+
+  d3.select("#filterInput").on("keyup", (d) => {
+    filterText = d.srcElement.value;
+    render();
+  });
+
+  const render = (yearIndex, offset) => {
+    const chart = component();
+
+    // filter
+    const dataForYear = dataForYears[yearIndex];
+
+    const dataForNextYear = dataForYears[yearIndex + 1];
+
+    const combined = dataForYear.map((line, index) => {
+      const data = line.data
+        .slice(offset)
+        .concat(dataForNextYear[index].data.slice(0, offset));
+      data.year = 100;
+      data.shape = line.shape;
+      return data;
+    });
+
+    d3.select("#container").datum(combined).call(chart);
+  };
+
+  let year = 0,
+    offset = 0;
+  setInterval(() => {
+    render(year, offset);
+    offset++;
+    if (offset > 53) {
+      offset = 0;
+      year++;
+    }
+  }, 10);
+});

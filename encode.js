@@ -1,6 +1,6 @@
 const fs = require("fs");
 
-const data = JSON.parse(fs.readFileSync("./multiples/data.json", "utf8"));
+const data = JSON.parse(fs.readFileSync("./data.json", "utf8"));
 
 const zones = [
   "Africa/Abidjan",
@@ -310,4 +310,4 @@ data.forEach((year) => {
   });
 });
 
-fs.writeFileSync("./data.json", JSON.stringify(data, null, 0));
+fs.writeFileSync("./data-encoded.json", JSON.stringify(data, null, 0));
